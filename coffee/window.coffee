@@ -6,9 +6,9 @@
 00     00  000  000   000  0000000     0000000   00     00
 ###
 
-{ $, args, keyinfo, klog, kpos, win } = require 'kxk'
+{ $, deg2rad, keyinfo, klog, kpos, win } = require 'kxk'
 
-THREE = require 'three'
+{ Fog, FogExp2, AmbientLight, BackSide, BoxBufferGeometry, BoxGeometry, Camera, Color, GridHelper, Mesh, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PCFSoftShadowMap, PMREMGenerator, PlaneGeometry, PointLight, PointLightHelper, Quaternion, Raycaster, Scene, SphereGeometry, Vector2, WebGLRenderer } = require 'three'
 
 Camera = require './camera'
 
@@ -25,6 +25,13 @@ class MainWin extends win
             context: false
             onLoad: @onLoad
           
+        @mouse = new Vector2
+        
+        @options =
+            dither: true
+            shadow: true
+            fog:    true
+            
         addEventListener 'pointerdown' @onMouseDown
         addEventListener 'pointermove' @onMouseMove
         addEventListener 'pointerup'   @onMouseUp
@@ -44,42 +51,122 @@ class MainWin extends win
     # 0000000    0000000  00000000  000   000  00000000  
     
     initScene: (@view) ->
-        
-        @onResize()
-        
-        @renderer = new THREE.WebGLRenderer antialias:true precision:'highp'
-
+                
+        @renderer = new WebGLRenderer antialias:true precision:'highp'
+            
         @renderer.setSize @view.offsetWidth, @view.offsetHeight
         @renderer.autoClear = false
         @renderer.sortObjects = true
-        @renderer.shadowMap.type = THREE.PCFSoftShadowMap
+        @renderer.shadowMap.type = PCFSoftShadowMap
         @renderer.shadowMap.enabled = true
         @renderer.setPixelRatio window.devicePixelRatio 
         @view.appendChild @renderer.domElement
-                        
-        @scene = new THREE.Scene()
+                       
+        @fogColor = new Color 'hsl(180, 0%, 4%)'
         
+        @onResize()
+        
+        br = @renderer.domElement.getBoundingClientRect()
+        @viewOffset = new Vector2 br.left, br.top
+        
+        @scene = new Scene()
+        @scene.background = @fogColor
         @camera = new Camera view:@view
 
-        @sun = new THREE.PointLight 0xffffff
+        @sun = new PointLight 0xffffff, 2, 200
         @sun.position.set 0 10 0
+        @sun.castShadow = true
+        @sun.shadow.mapSize = new Vector2 2*2048, 2*2048
         @scene.add @sun
         
-        @scene.add new THREE.PointLightHelper @sun, 1
+        @scene.add new PointLightHelper @sun, 1
+                
+        @ambient = new AmbientLight 0x181818
+        @scene.add @ambient
         
-        gridHelper = new THREE.GridHelper 400 40 0x0000ff, 0x808080
-        gridHelper.position.set 0 0 0
-        @scene.add gridHelper
+        material = new MeshStandardMaterial {
+            metalness: 0.6
+            roughness: 0.3
+            color:0x5555ff
+        }
         
-        # @ambient = new THREE.AmbientLight 0x111111
-        # @scene.add @ambient
+        geometry = new BoxGeometry 1 1 1
+        box = new Mesh geometry, material.clone()
+        box.position.set 0 1 0
+        box.castShadow = true
+        box.receiveShadow = true
+        box.name = 'box'
+        @scene.add box
+
+        material.color = new Color 0xff0000
+        material.flatShading = true
+        material.metalness = 0.9
+        geometry = new SphereGeometry 1 10 10
+        sphere = new Mesh geometry, material
+        sphere.position.set 2 1 1
+        sphere.castShadow = true
+        sphere.receiveShadow = true
+        sphere.name = 'sphere'
+        @scene.add sphere
+      
+        material = new MeshStandardMaterial {
+            metalness: 0.0
+            color: new Color 'hsl(180,0%,4%)'
+            roughness: 1.0
+            flatShading: true
+        }
         
-        geometry = new THREE.BoxGeometry 1 1 1
-        material = new THREE.MeshBasicMaterial color:0xaaaaaa
-        @scene.add new THREE.Mesh geometry, material
+        geometry = new PlaneGeometry 1000 1000 10
+        geometry.quaternion = new Quaternion
+        @plane = new Mesh geometry, material
+        @plane.castShadow = false
+        @plane.receiveShadow = true
+        @plane.name = 'plane'
+        @plane.rotation.set deg2rad(-90), 0 0
+        @scene.add @plane
+        
+        # klog Object.keys require 'three'
+        @scene.fog = new Fog @fogColor, 10 100
+
+        @setFog    @options.fog
+        @setDither @options.dither 
+        
+        @raycaster = new Raycaster
+        
+    toggleDither: -> @setDither not @options.dither
+    toggleFog: -> @setFog not @options.fog
+        
+    setDither: (d) -> 
+        @options.dither = d
+        @scene.traverse (node) ->
+            if node instanceof Mesh
+                node.material.dithering = d
+                node.material.needsUpdate = true
+        
+    setFog: (f) ->
+        @options.fog = f
+        if f 
+            @scene.fog.near = 50
+            @scene.fog.far  = 100
+        else
+            @scene.fog.near = 99999
+            @scene.fog.far  = 99999+1
+        
+    toggleGrid: ->
+        
+        if @grid
+            @scene.remove @grid
+            delete @grid
+        else
+            @grid = new GridHelper 100 100 0xffffff, 0x0
+            @scene.add @grid
         
     renderScene: =>
-        # @sun.position.copy @camera.getPosition()
+        
+        @sun.position.copy @camera.getPosition()
+        @sun.position.add @camera.getUp().multiplyScalar 3.0
+        @sun.position.add @camera.getRight().multiplyScalar -3.0
+        # klog @mouse
         @renderer.render @scene, @camera        
         requestAnimationFrame @renderScene
        
@@ -99,10 +186,10 @@ class MainWin extends win
   
         if @camera?
             @camera.aspect = @aspect
-            @camera.size = @viewSize
+            @camera.size   = @viewSize
             @camera.updateProjectionMatrix()
         
-        log 'oneResize' @viewSize
+        # log 'oneResize' @viewSize
         @renderer?.setSize w,h
         
     # 000   000  00000000  000   000  
@@ -126,6 +213,9 @@ class MainWin extends win
             when 'right' then @camera.startPivotRight()
             when 'up'    then @camera.startPivotUp()
             when 'down'  then @camera.startPivotDown()
+            when 'g'     then @toggleGrid()
+            when 'f'     then @toggleFog()
+            when 't'     then @toggleDither()
             else
                 klog 'keyDown' mod, key, combo, char, event.which
         
@@ -144,10 +234,25 @@ class MainWin extends win
     # 000 0 000  000   000  000   000       000  000       
     # 000   000   0000000    0000000   0000000   00000000  
 
-    onMouseDown: (event) => klog 'onMouseDown' kpos event
-    onMouseMove: (event) => #klog 'onMouseMove' kpos event
-    onMouseUp:   (event) => klog 'onMouseUp'   kpos event
+    mouseEvent: (event) ->
         
+        if @viewOffset
+            @mouse.x =   ( (event.clientX - @viewOffset.x) / @view.clientWidth ) * 2 - 1;
+            @mouse.y = - ( (event.clientY - @viewOffset.y) / @view.clientHeight ) * 2 + 1;
+    
+    onMouseMove: (event) => @mouseEvent event
+    onMouseUp:   (event) => @mouseEvent event
+    onMouseDown: (event) => @mouseEvent event; @pickObject()
+        
+    pickObject: ->
+        
+        @raycaster.setFromCamera @mouse, @camera
+        for intersect in @raycaster.intersectObjects @scene.children
+            if intersect?.object?.type == 'Mesh'
+                if intersect.object.name != 'plane'
+                    @camera.fadeToPos intersect.object.position
+                    return
+    
     # 00     00  00000000  000   000  000   000  
     # 000   000  000       0000  000  000   000  
     # 000000000  0000000   000 0 000  000   000  
@@ -156,7 +261,7 @@ class MainWin extends win
     
     onMenuAction: (action, args) =>
         
-        klog "menuAction #{action}" args
+        # klog "menuAction #{action}" args
                     
         super
                         
