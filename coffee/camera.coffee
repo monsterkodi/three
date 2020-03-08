@@ -6,7 +6,7 @@
  0000000  000   000  000   000  00000000  000   000  000   000
 ###
 
-{ clamp, deg2rad, kpos, prefs, reduce } = require 'kxk'
+{ clamp, deg2rad, gamepad, kpos, prefs, reduce } = require 'kxk'
 { Camera, PerspectiveCamera, Quaternion, Vector2, Vector3 } = require 'three'
 { abs, max, min } = Math
 
@@ -14,20 +14,21 @@ class Camera extends PerspectiveCamera
 
     @: (view:) ->
         
-        @elem = view
-        width  = @elem.clientWidth
-        height = @elem.clientHeight
-        
-        # klog "width #{width} height #{height}"
+        @elem  = view
+        width  = view.clientWidth
+        height = view.clientHeight
         
         super 70, width/height, 0.01, 300 # fov, aspect, near, far
         
-        @center     = new Vector3 0 0 0
         @size       = new Vector2 width, height 
         @pivot      = new Vector2
         @move       = new Vector3
         @maxDist    = @far/4
         @minDist    = 0.9
+        @center     = new Vector3 
+        @center.x   = prefs.get 'camera▸x' 0 
+        @center.y   = prefs.get 'camera▸y' 0 
+        @center.z   = prefs.get 'camera▸z' 0
         @dist       = prefs.get 'camera▸dist'  10
         @degree     = prefs.get 'camera▸degree' 0
         @rotate     = prefs.get 'camera▸rotate' 0
@@ -40,9 +41,22 @@ class Camera extends PerspectiveCamera
         @elem.addEventListener 'keyrelease' @onKeyRelease
         @elem.addEventListener 'dblclick'   @onDblClick
         
+        @gamepad = new gamepad true
+        @gamepad.on 'button' @onPadButton
+        
         @update()
         requestAnimationFrame @animationStep
-
+    
+    reset: ->
+        
+        @stopPivot()
+        @stopMoving()
+        @center = new Vector3 
+        @dist   = 10
+        @rotate = 0
+        @degree = 0
+        @update()
+        
     getPosition: -> @position
     getDir:      -> new Vector3(0 0 -1).applyQuaternion @quaternion 
     getUp:       -> new Vector3(0 1  0).applyQuaternion @quaternion  
@@ -109,6 +123,8 @@ class Camera extends PerspectiveCamera
         
     animationStep: =>
         
+        if state = @gamepad.getState()
+            @onPadAxis state
         
         now = window.performance.now()
         delta = (now - @lastAnimationTime) * 0.001
@@ -121,6 +137,46 @@ class Camera extends PerspectiveCamera
             animation delta
         
         requestAnimationFrame @animationStep
+    
+    # 00000000    0000000   0000000    
+    # 000   000  000   000  000   000  
+    # 00000000   000000000  000   000  
+    # 000        000   000  000   000  
+    # 000        000   000  0000000    
+      
+    onPadButton: (button, value) =>
+        
+        # klog 'button' button
+        if value
+            switch button
+                when 'A'  then @reset()
+                when 'LB' then @startMoveDown()
+                when 'RB' then @startMoveUp()
+                when 'LT' then @fastSpeed = true
+        else
+            switch button
+                when 'LB' then @stopMoving()
+                when 'RB' then @stopMoving()
+                when 'LT' then @fastSpeed = false
+    
+    onPadAxis: (state) => 
+    
+        @rotate += state.right.x
+        @degree -= state.right.y
+                    
+        if state.left.x or state.left.y
+            @move.z = -state.left.y
+            @move.x =  state.left.x
+            @startMove()
+            update = true
+        # else
+            # @stopMoving()
+            
+        if state.right.x or state.right.y
+            update = true
+            
+        if update
+            @update()
         
     # 00000000   000  000   000   0000000   000000000  
     # 000   000  000  000   000  000   000     000     
@@ -135,26 +191,18 @@ class Camera extends PerspectiveCamera
         
         @update()
            
-    startPivotLeft: ->
-        
-        @pivot.x = -1
-        @startPivot()
-        
-    startPivotRight: ->
-        
-        @pivot.x = 1
-        @startPivot()
+    startPivotLeft:  -> @pivot.x = -1; @startPivot()
+    startPivotRight: -> @pivot.x =  1; @startPivot()
 
-    startPivotUp: ->
-        
-        @pivot.y = -1
-        @startPivot()
-        
-    startPivotDown: ->
-        
-        @pivot.y = 1
-        @startPivot()
-        
+    startPivotUp:    -> @pivot.y = -1; @startPivot()
+    startPivotDown:  -> @pivot.y =  1; @startPivot()
+
+    stopPivotLeft:   -> @pivot.x = max 0 @pivot.x
+    stopPivotRight:  -> @pivot.x = min 0 @pivot.x
+
+    stopPivotUp:     -> @pivot.y = max 0 @pivot.y
+    stopPivotDown:   -> @pivot.y = min 0 @pivot.y
+    
     stopPivot: ->
         
         @pivoting = false
@@ -172,7 +220,7 @@ class Camera extends PerspectiveCamera
 
         @setPivot @pivot
         
-        @pivot.multiplyScalar 0.96
+        # @pivot.multiplyScalar 0.96
         
         if @pivot.length() > 0.001
             @animate @pivotCenter
@@ -239,41 +287,24 @@ class Camera extends PerspectiveCamera
     
     moveFactor: -> @dist/2
     
-    startMoveLeft: ->
-        
-        @move.x = -@moveFactor()
-        @startMove()
-        
-    startMoveRight: ->
-        
-        @move.x = @moveFactor()
-        @startMove()
+    startMoveRight:    -> @move.x =  @moveFactor(); @startMove()
+    startMoveLeft:     -> @move.x = -@moveFactor(); @startMove()
 
-    startMoveUp: ->
-        
-        @move.y = @moveFactor()
-        @startMove()
-        
-    startMoveDown: ->
-        
-        @move.y = -@moveFactor()
-        @startMove()
+    startMoveUp:       -> @move.y =  @moveFactor(); @startMove()
+    startMoveDown:     -> @move.y = -@moveFactor(); @startMove()
 
-    startMoveForward: ->
-        
-        @move.z = -@moveFactor()
-        @startMove()
-        
-    startMoveBackward: ->
-        
-        @move.z =  @moveFactor()
-        @startMove()
-        
-    stopMoving: ->
-        
-        @moving = false
-        @move.set 0 0 0
-       
+    startMoveBackward: -> @move.z =  @moveFactor(); @startMove()
+    startMoveForward:  -> @move.z = -@moveFactor(); @startMove()
+
+    stopMoveRight:     -> @move.x = min 0 @move.x
+    stopMoveLeft:      -> @move.x = max 0 @move.x
+
+    stopMoveUp:        -> @move.y = min 0 @move.y
+    stopMoveDown:      -> @move.y = max 0 @move.y
+
+    stopMoveBackward:  -> @move.z = min 0 @move.z
+    stopMoveForward:   -> @move.z = max 0 @move.z
+    
     startMove: -> 
         
         @fading = false
@@ -281,6 +312,11 @@ class Camera extends PerspectiveCamera
             @animate @moveCenter
             @moving = true
             
+    stopMoving: ->
+        
+        @moving = false
+        @move.set 0 0 0
+        
     moveCenter: (deltaSeconds) =>
         
         return if not @moving
@@ -294,7 +330,8 @@ class Camera extends PerspectiveCamera
         @center.add dir
         @update()
         
-        @move.multiplyScalar 0.96
+        # @move.multiplyScalar 0.96
+        
         if @move.length() > 0.001
             @animate @moveCenter
         else
@@ -388,7 +425,8 @@ class Camera extends PerspectiveCamera
         prefs.set 'camera▸dist'   @dist
         prefs.set 'camera▸degree' @degree
         prefs.set 'camera▸rotate' @rotate
-        
-        # log "camera:", @dist, @rotate, @degree
+        prefs.set 'camera▸x' @center.x 
+        prefs.set 'camera▸y' @center.y  
+        prefs.set 'camera▸z' @center.z
 
 module.exports = Camera

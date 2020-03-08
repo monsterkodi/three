@@ -6,11 +6,12 @@
 00     00  000  000   000  0000000     0000000   00     00
 ###
 
-{ $, deg2rad, keyinfo, klog, kpos, win } = require 'kxk'
+{ $, deg2rad, keyinfo, klog, kpos, prefs, win } = require 'kxk'
 
-{ Fog, FogExp2, AmbientLight, BackSide, BoxBufferGeometry, BoxGeometry, Camera, Color, GridHelper, Mesh, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PCFSoftShadowMap, PMREMGenerator, PlaneGeometry, PointLight, PointLightHelper, Quaternion, Raycaster, Scene, SphereGeometry, Vector2, WebGLRenderer } = require 'three'
+{ AxesHelper, Fog, FogExp2, AmbientLight, BackSide, BoxBufferGeometry, BoxGeometry, Camera, Color, GridHelper, Mesh, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PCFSoftShadowMap, PMREMGenerator, PlaneGeometry, PointLight, PointLightHelper, Quaternion, Raycaster, Scene, SphereGeometry, Vector2, WebGLRenderer } = require 'three'
 
 Camera = require './camera'
+FPS    = require './fps'
 
 class MainWin extends win
     
@@ -27,10 +28,7 @@ class MainWin extends win
           
         @mouse = new Vector2
         
-        @options =
-            dither: true
-            shadow: true
-            fog:    true
+        @initOptions()
             
         addEventListener 'pointerdown' @onMouseDown
         addEventListener 'pointermove' @onMouseMove
@@ -55,9 +53,9 @@ class MainWin extends win
         @renderer = new WebGLRenderer antialias:true precision:'highp'
             
         @renderer.setSize @view.offsetWidth, @view.offsetHeight
-        @renderer.autoClear = false
-        @renderer.sortObjects = true
-        @renderer.shadowMap.type = PCFSoftShadowMap
+        @renderer.autoClear         = false
+        @renderer.sortObjects       = true
+        @renderer.shadowMap.type    = PCFSoftShadowMap
         @renderer.shadowMap.enabled = true
         @renderer.setPixelRatio window.devicePixelRatio 
         @view.appendChild @renderer.domElement
@@ -115,7 +113,7 @@ class MainWin extends win
             roughness: 1.0
             flatShading: true
         }
-        
+                
         geometry = new PlaneGeometry 1000 1000 10
         geometry.quaternion = new Quaternion
         @plane = new Mesh geometry, material
@@ -124,49 +122,28 @@ class MainWin extends win
         @plane.name = 'plane'
         @plane.rotation.set deg2rad(-90), 0 0
         @scene.add @plane
-        
+
         # klog Object.keys require 'three'
         @scene.fog = new Fog @fogColor, 10 100
 
-        @setFog    @options.fog
-        @setDither @options.dither 
+        for opt in Object.keys @options
+            @setOption opt, @options[opt]
         
         @raycaster = new Raycaster
         
-    toggleDither: -> @setDither not @options.dither
-    toggleFog: -> @setFog not @options.fog
-        
-    setDither: (d) -> 
-        @options.dither = d
-        @scene.traverse (node) ->
-            if node instanceof Mesh
-                node.material.dithering = d
-                node.material.needsUpdate = true
-        
-    setFog: (f) ->
-        @options.fog = f
-        if f 
-            @scene.fog.near = 50
-            @scene.fog.far  = 100
-        else
-            @scene.fog.near = 99999
-            @scene.fog.far  = 99999+1
-        
-    toggleGrid: ->
-        
-        if @grid
-            @scene.remove @grid
-            delete @grid
-        else
-            @grid = new GridHelper 100 100 0xffffff, 0x0
-            @scene.add @grid
-        
+    # 00000000   00000000  000   000  0000000    00000000  00000000   
+    # 000   000  000       0000  000  000   000  000       000   000  
+    # 0000000    0000000   000 0 000  000   000  0000000   0000000    
+    # 000   000  000       000  0000  000   000  000       000   000  
+    # 000   000  00000000  000   000  0000000    00000000  000   000  
+    
     renderScene: =>
         
+        @fps?.draw()
         @sun.position.copy @camera.getPosition()
-        @sun.position.add @camera.getUp().multiplyScalar 3.0
-        @sun.position.add @camera.getRight().multiplyScalar -3.0
-        # klog @mouse
+        @sun.position.add  @camera.getUp().multiplyScalar 3.0
+        @sun.position.add  @camera.getRight().multiplyScalar -3.0
+
         @renderer.render @scene, @camera        
         requestAnimationFrame @renderScene
        
@@ -189,9 +166,79 @@ class MainWin extends win
             @camera.size   = @viewSize
             @camera.updateProjectionMatrix()
         
-        # log 'oneResize' @viewSize
         @renderer?.setSize w,h
         
+    #  0000000   00000000   000000000  000   0000000   000   000   0000000  
+    # 000   000  000   000     000     000  000   000  0000  000  000       
+    # 000   000  00000000      000     000  000   000  000 0 000  0000000   
+    # 000   000  000           000     000  000   000  000  0000       000  
+    #  0000000   000           000     000   0000000   000   000  0000000   
+    
+    initOptions: ->
+        
+        @options = {}
+        for opt in ['fps' 'plane' 'grid' 'axes' 'dither' 'shadow' 'fog']
+            @options[opt] =  prefs.get "option▸#{opt}" true
+    
+    toggle: (opt) -> @setOption opt, not @options[opt]
+
+    setOption: (opt, val) -> 
+        
+        @options[opt] = val
+        prefs.set "option▸#{opt}" val
+        
+        switch opt
+            
+            when 'fps'
+                if val
+                    @fps = new FPS
+                else
+                    @fps?.remove()
+                    delete @fps
+            
+            when 'shadow'
+                
+                @renderer.shadowMap.enabled = val
+                @sun.castShadow = val
+                
+            when 'plane'
+                if val
+                    @scene.add @plane
+                else
+                    @scene.remove @plane
+            
+            when 'dither'
+                @scene.traverse (node) ->
+                    if node instanceof Mesh
+                        node.material.dithering = val
+                        node.material.needsUpdate = true
+                        
+            when 'fog'
+                if val
+                    @scene.fog.near = 10
+                    @scene.fog.far  = 50
+                else
+                    @scene.fog.near = 99999
+                    @scene.fog.far  = 99999+1
+        
+            when 'grid'
+                if val
+                    @grid = new GridHelper 100 100 0x333333, 0x0
+                    @grid.position.y = 0.05
+                    @scene.add @grid
+                else
+                    @scene.remove @grid
+                    delete @grid
+            
+            when 'axes'
+                if val
+                    @axes = new AxesHelper 100
+                    @axes.position.y = 0.06
+                    @scene.add @axes
+                else
+                    @scene.remove @axes
+                    delete @axes
+                
     # 000   000  00000000  000   000  
     # 000  000   000        000 000   
     # 0000000    0000000     00000    
@@ -201,6 +248,8 @@ class MainWin extends win
     onKeyDown: (event) =>
 
         { mod, key, combo, char } = keyinfo.forEvent event
+        
+        return if event.repeat
         
         switch key
             when 'w'     then @camera.startMoveForward()
@@ -213,9 +262,14 @@ class MainWin extends win
             when 'right' then @camera.startPivotRight()
             when 'up'    then @camera.startPivotUp()
             when 'down'  then @camera.startPivotDown()
-            when 'g'     then @toggleGrid()
-            when 'f'     then @toggleFog()
-            when 't'     then @toggleDither()
+            when 'r'     then @camera.reset()
+            when 'g'     then @toggle 'grid'
+            when 'p'     then @toggle 'plane'
+            when 'h'     then @toggle 'shadow'
+            when 'y'     then @toggle 'axes'
+            when 'f'     then @toggle 'fog'
+            when 'o'     then @toggle 'fps'
+            when 't'     then @toggle 'dither'
             else
                 klog 'keyDown' mod, key, combo, char, event.which
         
@@ -225,6 +279,18 @@ class MainWin extends win
         
         { mod, key, combo, char } = keyinfo.forEvent event
         # klog 'keyUp' mod, key, combo, char, event.which
+        
+        switch key
+            when 'w'     then @camera.stopMoveForward()
+            when 's'     then @camera.stopMoveBackward()
+            when 'a'     then @camera.stopMoveLeft()
+            when 'd'     then @camera.stopMoveRight()
+            when 'q'     then @camera.stopMoveDown()
+            when 'e'     then @camera.stopMoveUp()
+            when 'left'  then @camera.stopPivotLeft()
+            when 'right' then @camera.stopPivotRight()
+            when 'up'    then @camera.stopPivotUp()
+            when 'down'  then @camera.stopPivotDown()
         
         super
         
@@ -242,10 +308,11 @@ class MainWin extends win
     
     onMouseMove: (event) => @mouseEvent event
     onMouseUp:   (event) => @mouseEvent event
-    onMouseDown: (event) => @mouseEvent event; @pickObject()
+    onMouseDown: (event) => @mouseEvent event; @pickObject event
         
-    pickObject: ->
+    pickObject: (event) ->
         
+        return if event.buttons != 1
         @raycaster.setFromCamera @mouse, @camera
         for intersect in @raycaster.intersectObjects @scene.children
             if intersect?.object?.type == 'Mesh'
