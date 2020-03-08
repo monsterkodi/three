@@ -1,0 +1,13 @@
+name          three
+version       0.1.0
+description   three js toy
+main          js/main.js
+author        monsterkodi@gmx.net
+license       Unlicense
+dependencies
+              electron        ^8.1.0
+              electron-packager  ^14.2.1
+              electron-rebuild  ^1.10.0
+              koffee          ^1.12.0
+              kxk             ^0.385.0
+              three           ^0.114.0
