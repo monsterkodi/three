@@ -6,7 +6,7 @@
 00     00  000  000   000  0000000     0000000   00     00
 ###
 
-{ $, deg2rad, keyinfo, klog, kpos, prefs, win } = require 'kxk'
+{ $, deg2rad, keyinfo, kpos, prefs, win } = require 'kxk'
 
 { AxesHelper, Fog, FogExp2, AmbientLight, BackSide, BoxBufferGeometry, BoxGeometry, Camera, Color, GridHelper, Mesh, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PCFSoftShadowMap, PMREMGenerator, PlaneGeometry, PointLight, PointLightHelper, Quaternion, Raycaster, Scene, SphereGeometry, Vector2, WebGLRenderer } = require 'three'
 
@@ -263,6 +263,8 @@ class MainWin extends win
             when 'up'    then @camera.startPivotUp()
             when 'down'  then @camera.startPivotDown()
             when 'r'     then @camera.reset()
+            when '1'     then @camera.decrementMoveSpeed()
+            when '2'     then @camera.incrementMoveSpeed()
             when 'g'     then @toggle 'grid'
             when 'p'     then @toggle 'plane'
             when 'h'     then @toggle 'shadow'
@@ -270,8 +272,8 @@ class MainWin extends win
             when 'f'     then @toggle 'fog'
             when 'o'     then @toggle 'fps'
             when 't'     then @toggle 'dither'
-            else
-                klog 'keyDown' mod, key, combo, char, event.which
+            # else
+                # klog 'keyDown' mod, key, combo, char, event.which
         
         super
         
@@ -317,7 +319,7 @@ class MainWin extends win
         for intersect in @raycaster.intersectObjects @scene.children
             if intersect?.object?.type == 'Mesh'
                 if intersect.object.name != 'plane'
-                    @camera.fadeToPos intersect.object.position
+                    @camera.setPivotCenter intersect.object.position
                     return
     
     # 00     00  00000000  000   000  000   000  

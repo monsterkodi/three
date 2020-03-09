@@ -6,7 +6,7 @@
  0000000  000   000  000   000  00000000  000   000  000   000
 ###
 
-{ clamp, deg2rad, gamepad, kpos, prefs, reduce } = require 'kxk'
+{ clamp, deg2rad, empty, gamepad, kpos, prefs, reduce } = require 'kxk'
 { Camera, PerspectiveCamera, Quaternion, Vector2, Vector3 } = require 'three'
 { abs, max, min } = Math
 
@@ -23,8 +23,9 @@ class Camera extends PerspectiveCamera
         @size       = new Vector2 width, height 
         @pivot      = new Vector2
         @move       = new Vector3
+        @moveSpeed  = 4
         @maxDist    = @far/4
-        @minDist    = 0.9
+        @minDist    = 1
         @center     = new Vector3 
         @center.x   = prefs.get 'camera▸x' 0 
         @center.y   = prefs.get 'camera▸y' 0 
@@ -41,22 +42,28 @@ class Camera extends PerspectiveCamera
         @elem.addEventListener 'keyrelease' @onKeyRelease
         @elem.addEventListener 'dblclick'   @onDblClick
         
-        @gamepad = new gamepad true
+        @gamepad = new gamepad
         @gamepad.on 'button' @onPadButton
+        @gamepad.on 'axis'   @onPadAxis
         
         @update()
         requestAnimationFrame @animationStep
     
     reset: ->
         
+        @center    = new Vector3 
+        @dist      = 10
+        @rotate    = 0
+        @degree    = 0
+        @moveSpeed = 4
+        
         @stopPivot()
         @stopMoving()
-        @center = new Vector3 
-        @dist   = 10
-        @rotate = 0
-        @degree = 0
         @update()
         
+    incrementMoveSpeed: -> @moveSpeed *= 1.5; @moveSpeed = min 20 @moveSpeed; #klog 'moveSpeed' @moveSpeed
+    decrementMoveSpeed: -> @moveSpeed /= 1.5; @moveSpeed = max 1  @moveSpeed; #klog 'moveSpeed' @moveSpeed
+    
     getPosition: -> @position
     getDir:      -> new Vector3(0 0 -1).applyQuaternion @quaternion 
     getUp:       -> new Vector3(0 1  0).applyQuaternion @quaternion  
@@ -123,8 +130,8 @@ class Camera extends PerspectiveCamera
         
     animationStep: =>
         
-        if state = @gamepad.getState()
-            @onPadAxis state
+        # if state = @gamepad.getState()
+            # @onPadAxis state
         
         now = window.performance.now()
         delta = (now - @lastAnimationTime) * 0.001
@@ -152,32 +159,34 @@ class Camera extends PerspectiveCamera
                 when 'A'  then @reset()
                 when 'LB' then @startMoveDown()
                 when 'RB' then @startMoveUp()
-                when 'LT' then @fastSpeed = true
+                when 'X'  then @decrementMoveSpeed()
+                when 'Y'  then @incrementMoveSpeed()
         else
             switch button
-                when 'LB' then @stopMoving()
-                when 'RB' then @stopMoving()
-                when 'LT' then @fastSpeed = false
+                when 'LB' then @stopMoveDown()
+                when 'RB' then @stopMoveUp()
     
     onPadAxis: (state) => 
     
-        @rotate += state.right.x
-        @degree -= state.right.y
-                    
         if state.left.x or state.left.y
-            @move.z = -state.left.y
-            @move.x =  state.left.x
+            @move.z = -state.left.y * 4.0
+            @move.x =  state.left.x * 4.0
             @startMove()
             update = true
-        # else
-            # @stopMoving()
+        else if empty state.buttons
+            @stopMoving()
             
         if state.right.x or state.right.y
+            @pivot.x =  state.right.x
+            @pivot.y = -state.right.y
+            @startPivot()
             update = true
+        else if empty state.buttons
+            @stopPivot()
             
         if update
             @update()
-        
+                    
     # 00000000   000  000   000   0000000   000000000  
     # 000   000  000  000   000  000   000     000     
     # 00000000   000   000 000   000   000     000     
@@ -279,13 +288,27 @@ class Camera extends PerspectiveCamera
         else
             delete @fading
 
+    setPivotCenter: (pos) ->
+        dist = @position.distanceTo pos
+        @dist = clamp @minDist, @maxDist, dist
+        @center.copy @position
+        @center.add @getDir().multiplyScalar @dist
+        @fadeToPos pos
+                                
+    resetDist: ->
+        
+        if @dist > @minDist
+            @dist = @minDist
+            @center.copy @position
+            @center.add @getDir().multiplyScalar @dist
+            
     # 00     00   0000000   000   000  00000000  
     # 000   000  000   000  000   000  000       
     # 000000000  000   000   000 000   0000000   
     # 000 0 000  000   000     000     000       
     # 000   000   0000000       0      00000000  
     
-    moveFactor: -> @dist/2
+    moveFactor: -> 1.0 #@dist/2
     
     startMoveRight:    -> @move.x =  @moveFactor(); @startMove()
     startMoveLeft:     -> @move.x = -@moveFactor(); @startMove()
@@ -307,6 +330,9 @@ class Camera extends PerspectiveCamera
     
     startMove: -> 
         
+        if @move.x or @move.y
+            @resetDist()
+            
         @fading = false
         if not @moving
             @animate @moveCenter
@@ -321,13 +347,15 @@ class Camera extends PerspectiveCamera
         
         return if not @moving
         
-        dir = new Vector3
-        dir.add @move
-
-        dir.multiplyScalar deltaSeconds
+        dir = @move.clone()
+        dir.multiplyScalar deltaSeconds*@moveSpeed
         dir.applyQuaternion @quaternion
         
-        @center.add dir
+        if @move.z and (not @move.y) and (not @move.x) and @dist > @minDist
+            @dist += @move.z/16.0
+        else
+            @center.add dir
+            
         @update()
         
         # @move.multiplyScalar 0.96
