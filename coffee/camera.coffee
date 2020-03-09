@@ -118,7 +118,7 @@ class Camera extends PerspectiveCamera
             @mouseMoved = true
         
         if event.buttons & 4
-            s = @dist
+            s = @dist <= @minDist and 10 or @dist
             @pan x*2*s/@size.x, y*s/@size.y
             
         if event.buttons & 2
@@ -228,8 +228,6 @@ class Camera extends PerspectiveCamera
         return if not @pivoting
 
         @setPivot @pivot
-        
-        # @pivot.multiplyScalar 0.96
         
         if @pivot.length() > 0.001
             @animate @pivotCenter
@@ -357,8 +355,6 @@ class Camera extends PerspectiveCamera
             @center.add dir
             
         @update()
-        
-        # @move.multiplyScalar 0.96
         
         if @move.length() > 0.001
             @animate @moveCenter
