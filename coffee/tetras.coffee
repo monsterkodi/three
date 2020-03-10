@@ -13,27 +13,26 @@ class Tetras
 
     @renderScene: (scene) ->
         
-        material = new MeshStandardMaterial {
+        material = new MeshStandardMaterial 
             metalness: 0.5
             roughness: 0.5
             flatShading: true
             vertexColors: true
-        }
                         
         geometry = new BufferGeometry()
         vertices = new Float32Array [
             #   0      1      2      3      4      5      6      7
-            0 0 0  1 0 0  0 1 0  0 0 1  1 1 0  1 0 1  0 1 1  1 1 1
+            0 0 0  1 0 0  0 1 0  1 1 0  0 0 1  1 0 1  0 1 1  1 1 1
         ]
         
         indices = [
             0 1 5  1 0 2  5 2 0  2 5 1
-            3 0 5  0 3 2  2 5 0  5 2 3
-            3 6 2  6 3 5  5 2 6  2 5 3 
+            4 0 5  0 4 2  2 5 0  5 2 4
+            4 6 2  6 4 5  5 2 6  2 5 4 
             
-            4 5 1  1 2 4  5 4 2  2 1 5 
-            7 5 4  4 2 7  2 4 5  5 7 2 
-            7 2 6  6 5 7  5 6 2  2 7 5  
+            1 3 5  3 1 2  2 5 3  5 2 1  
+            3 7 5  7 3 2  5 2 3  2 5 7  
+            6 7 2  7 6 5  2 5 6  5 2 7   
         ]
         
         geometry.setIndex indices
