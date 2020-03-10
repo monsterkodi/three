@@ -8,10 +8,11 @@
 
 { $, deg2rad, keyinfo, kpos, prefs, win } = require 'kxk'
 
-{ AxesHelper, Fog, FogExp2, AmbientLight, BackSide, BoxBufferGeometry, BoxGeometry, Camera, Color, GridHelper, Mesh, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PCFSoftShadowMap, PMREMGenerator, PlaneGeometry, PointLight, PointLightHelper, Quaternion, Raycaster, Scene, SphereGeometry, Vector2, WebGLRenderer } = require 'three'
+{ AmbientLight, AxesHelper, BoxGeometry, Camera, Color, Fog, GridHelper, Mesh, MeshStandardMaterial, PCFSoftShadowMap, PlaneGeometry, PointLight, PointLightHelper, Raycaster, Scene, SphereGeometry, Vector2, WebGLRenderer } = require 'three'
 
 Camera = require './camera'
 FPS    = require './fps'
+Tetras = require './tetras'
 
 class MainWin extends win
     
@@ -39,6 +40,8 @@ class MainWin extends win
         window.onresize = @onResize
         
         @initScene $ "#main"
+        
+        Tetras.renderScene @scene
         
         requestAnimationFrame @renderScene
         
@@ -88,24 +91,25 @@ class MainWin extends win
             color:0x5555ff
         }
         
-        geometry = new BoxGeometry 1 1 1
-        box = new Mesh geometry, material.clone()
-        box.position.set 0 1 0
-        box.castShadow = true
-        box.receiveShadow = true
-        box.name = 'box'
-        @scene.add box
-
-        material.color = new Color 0xff0000
-        material.flatShading = true
-        material.metalness = 0.9
-        geometry = new SphereGeometry 1 10 10
-        sphere = new Mesh geometry, material
-        sphere.position.set 2 1 1
-        sphere.castShadow = true
-        sphere.receiveShadow = true
-        sphere.name = 'sphere'
-        @scene.add sphere
+        if false
+            geometry = new BoxGeometry 1 1 1
+            box = new Mesh geometry, material.clone()
+            box.position.set 0 1 -2
+            box.castShadow = true
+            box.receiveShadow = true
+            box.name = 'box'
+            @scene.add box
+    
+            material.color = new Color 0xff0000
+            material.flatShading = true
+            material.metalness = 0.9
+            geometry = new SphereGeometry 1 10 10
+            sphere = new Mesh geometry, material
+            sphere.position.set 0 3 -2
+            sphere.castShadow = true
+            sphere.receiveShadow = true
+            sphere.name = 'sphere'
+            @scene.add sphere
       
         material = new MeshStandardMaterial {
             metalness: 0.0
@@ -113,13 +117,13 @@ class MainWin extends win
             roughness: 1.0
             flatShading: true
         }
-                
+              
         geometry = new PlaneGeometry 1000 1000 10
-        geometry.quaternion = new Quaternion
         @plane = new Mesh geometry, material
         @plane.castShadow = false
         @plane.receiveShadow = true
         @plane.name = 'plane'
+        @plane.position.y = -0.1
         @plane.rotation.set deg2rad(-90), 0 0
         @scene.add @plane
 

@@ -130,9 +130,6 @@ class Camera extends PerspectiveCamera
         
     animationStep: =>
         
-        # if state = @gamepad.getState()
-            # @onPadAxis state
-        
         now = window.performance.now()
         delta = (now - @lastAnimationTime) * 0.001
         
