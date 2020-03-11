@@ -8,7 +8,7 @@
 
 { $, deg2rad, keyinfo, kpos, prefs, win } = require 'kxk'
 
-{ AmbientLight, AxesHelper, BoxGeometry, Camera, Color, Fog, GridHelper, Mesh, MeshStandardMaterial, PCFSoftShadowMap, PlaneGeometry, PointLight, PointLightHelper, Raycaster, Scene, SphereGeometry, Vector2, WebGLRenderer } = require 'three'
+{ AmbientLight, AxesHelper, Camera, Color, Fog, GridHelper, Mesh, MeshStandardMaterial, PCFSoftShadowMap, PlaneGeometry, PointLight, PointLightHelper, Raycaster, Scene, Vector2, WebGLRenderer } = require 'three'
 
 Camera = require './camera'
 FPS    = require './fps'
@@ -91,32 +91,11 @@ class MainWin extends win
             color:0x5555ff
         }
         
-        if false
-            geometry = new BoxGeometry 1 1 1
-            box = new Mesh geometry, material.clone()
-            box.position.set 0 1 -2
-            box.castShadow = true
-            box.receiveShadow = true
-            box.name = 'box'
-            @scene.add box
-    
-            material.color = new Color 0xff0000
-            material.flatShading = true
-            material.metalness = 0.9
-            geometry = new SphereGeometry 1 10 10
-            sphere = new Mesh geometry, material
-            sphere.position.set 0 3 -2
-            sphere.castShadow = true
-            sphere.receiveShadow = true
-            sphere.name = 'sphere'
-            @scene.add sphere
-      
-        material = new MeshStandardMaterial {
+        material = new MeshStandardMaterial
             metalness: 0.0
             color: new Color 'hsl(180,0%,4%)'
             roughness: 1.0
             flatShading: true
-        }
               
         geometry = new PlaneGeometry 1000 1000 10
         @plane = new Mesh geometry, material
