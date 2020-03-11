@@ -7,7 +7,8 @@
 ###
 
 { klog } = require 'kxk'
-{ BufferAttribute, BufferGeometry, Float32BufferAttribute, LineSegments, Mesh, MeshStandardMaterial, Points, PointsMaterial, Uint32BufferAttribute, WireframeGeometry } = require 'three'
+{ BufferAttribute, BufferGeometry, Float32BufferAttribute, LineSegments, Mesh, MeshStandardMaterial, Points, PointsMaterial, Uint32BufferAttribute, Vector3, WireframeGeometry } = require 'three'
+{ max } = Math
 
 TETRA = [
     [ [0 5 4] [0 14 15] [4 14 15 4 15 5] [5 15 16] [4 15 16 4 0 15] [5 14 16 5 0 14] [4 14 16] ]
@@ -22,7 +23,9 @@ CUBE = [
     [4 3   1  0    2 0  32 3] [4 3   1  0   16 3  32 3] [4 3  64  6   16 3  32 3]
     [4 3   8  3    2 0  32 3] [4 3   8  3  128 6  32 3] [4 3  64  6  128 6  32 3] 
 ]
-            
+     
+OFFSET = [ 0 0 0  1 0 0  0 1 0  1 1 0  0 0 1  1 0 1  0 1 1  1 1 1 ]  
+
 class Tetras
     
     @vertices = []
@@ -36,39 +39,52 @@ class Tetras
     # 000   000  00000000  000   000  0000000    00000000  000   000  
     
     @renderScene: (scene) ->
-        
-        material = new MeshStandardMaterial 
-            metalness:    0.5
-            roughness:    0.5
-            flatShading:  true
-            # vertexColors: true
+                   
+        if true then @debugGrid scene
             
-        @cubeSize = 100
+        @cubeSize = 10
         
         @vertices = new Float32Array @cubeSize*@cubeSize*@cubeSize*3*19
         @indices  = new Uint32Array @cubeSize*@cubeSize*@cubeSize*3*6*2
-        @vertex   = -1
-        @index    = -1
-        @points   = []
-        
-        if false then @debugGrid scene
-              
-        klog 'cubes' @vertices.length, @indices.length
-        ▸average 10
-            @vertex = -1
-            @index  = -1
+        @vertex   = 0
+        @index    = 0
+                      
+        # klog 'cubes' @vertices.length, @indices.length
+
+        # ▸average 10
+        if true
+        # if false
+            
+            @vertex = 0
+            @index  = 0
+            
             for i in [0...@cubeSize]
                 for j in [0...@cubeSize]
                     for k in [0...@cubeSize]
-                        @addCube i+j+k, i,j,k
+                        @addCube @cubeAt(i,j,k), i,j,k
         
-        geometry = new BufferGeometry()
-        geometry.setIndex new Uint32BufferAttribute @indices.slice(0 @index), 1
-        geometry.setAttribute 'position' new BufferAttribute @vertices, 3
-        mesh = new Mesh geometry, material
-        
-        scene.add mesh
+            klog "vertex #{@vertex} index #{@index} tris #{(@index+1)/3} buffers" @vertices.length, @indices.length
+            geometry = new BufferGeometry()
+            geometry.setIndex new Uint32BufferAttribute @indices.slice(0 @index), 1
+            geometry.setAttribute 'position' new BufferAttribute @vertices, 3
+            # geometry.setAttribute 'color' new BufferAttribute @vertices, 3
+            scene.add new Mesh geometry, new MeshStandardMaterial 
+                metalness:    0.5
+                roughness:    0.5
+                flatShading:  true
       
+    @cubeAt: (i, j, k) ->
+        
+        c = 0
+        for a in [0..7]
+            x = i+OFFSET[a*3+0]
+            y = j+OFFSET[a*3+1]
+            z = k+OFFSET[a*3+2]
+            v = new Vector3 x,y,z
+            v.sub new Vector3 @cubeSize/2 @cubeSize/2 @cubeSize/2
+            c |= (((v.length() <= @cubeSize/2) and 1 or 0) << a)
+        c
+        
     #  0000000  000   000  0000000    00000000  
     # 000       000   000  000   000  000       
     # 000       000   000  0000000    0000000   
@@ -172,10 +188,14 @@ class Tetras
           
         frame = (x,y,z) -> [x,y,z, x+1,y,z, x,y+1,z, x+1,y+1,z, x,y,z+1, x+1,y,z+1, x,y+1,z+1, x+1,y+1,z+1]
             
+        indices = []
+        vertices = []
+        points = []
+        
         for i in [0..15]
             for j in [0..15]
-                @indices = @indices.concat tetraind.map (idx) => idx+@vertices.length/3
-                @vertices = @vertices.concat frame i*2,  0,j*2
+                indices = indices.concat tetraind.map (idx) -> idx+vertices.length/3
+                vertices = vertices.concat frame  i*2,  0,j*2
                 if (i+j*16)&1   then @points.push i*2,  0,j*2
                 if (i+j*16)&2   then @points.push i*2+1,0,j*2
                 if (i+j*16)&4   then @points.push i*2,  1,j*2
@@ -186,9 +206,9 @@ class Tetras
                 if (i+j*16)&128 then @points.push i*2+1,1,j*2+1
     
         geometry = new BufferGeometry()
-        geometry.setIndex @indices
-        geometry.setAttribute 'position' new Float32BufferAttribute @vertices, 3
-        geometry.setAttribute 'color'    new Float32BufferAttribute @vertices, 3
+        geometry.setIndex indices
+        geometry.setAttribute 'position' new Float32BufferAttribute vertices, 3
+        geometry.setAttribute 'color'    new Float32BufferAttribute vertices, 3
                 
         line = new LineSegments new WireframeGeometry geometry
         line.material.depthTest   = false
@@ -197,20 +217,33 @@ class Tetras
         scene.add line
     
         geometry = new BufferGeometry()
-        geometry.setAttribute 'position' new Float32BufferAttribute @points, 3
+        geometry.setAttribute 'position' new Float32BufferAttribute points, 3
         pmat = new PointsMaterial color:0xffff88
         pmat.size        = 0.1
         pmat.depthTest   = false
         pmat.opacity     = 0.5
         pmat.transparent = true
         scene.add new Points geometry, pmat
-    
-        @vertex   = -1
-        @vertices = []
-        @indices  = []
+           
+        @vertices = new Float32Array 16*16*3*19
+        @indices  = new Uint32Array 16*16*3*6*2
+        @vertex   = 0
+        @index    = 0
         
         for i in [0..15]
             for j in [0..15]
                 @addCube i+j*16, i*2, 0, j*2
-            
+                
+        geometry = new BufferGeometry()
+        geometry.setIndex new Uint32BufferAttribute @indices.slice(0 @index), 1
+        geometry.setAttribute 'position' new BufferAttribute @vertices, 3
+        geometry.setAttribute 'color' new BufferAttribute @vertices, 3
+        mesh = new Mesh geometry, new MeshStandardMaterial 
+            metalness:    0.5
+            roughness:    0.5
+            flatShading:  true
+            vertexColors: true
+        
+        scene.add mesh
+        
 module.exports = Tetras
