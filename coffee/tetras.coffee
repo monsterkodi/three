@@ -9,6 +9,58 @@
 { klog } = require 'kxk'
 { BufferGeometry, Float32BufferAttribute, LineSegments, Mesh, MeshStandardMaterial, Points, PointsMaterial, WireframeGeometry } = require 'three'
 
+TETRA = [
+                [
+                    [0 5 4]          
+                    [0 14 15]          
+                    [4 14 15 4 15 5] 
+                    [5 15 16]          
+                    [4 15 16 4 0 15] 
+                    [5 14 16 5 0 14] 
+                    [4 14 16]          
+                ],[
+                    [0 4 8]          
+                    [0 18 14]          
+                    [8 18 14 8 14 4] 
+                    [8 17 18]          
+                    [0 17 18 0 4 17] 
+                    [8 17 14 8 14 0] 
+                    [4 17 14]          
+                ],[
+                    [4 13 8]          
+                    [2 13 7]          
+                    [7 2 8 7 8 4] 
+                    [2 17 8]          
+                    [17 13 2 17 4 13] 
+                    [7 17 8 7 8 13] 
+                    [4 7 17]          
+                ],[
+                    [4 5 10]          
+                    [1 6 10]          
+                    [6 4 5 6 5 1] 
+                    [1 5 16]          
+                    [1 10 4 1 4 16] 
+                    [6 10 5 6 5 16] 
+                    [6 4 16]          
+                ],[
+                    [4 10 9]          
+                    [6 11 10]          
+                    [4 6 11 4 11 9] 
+                    [3 9 11]          
+                    [4 10 11 4 11 3] 
+                    [6 3 9 6 9 10] 
+                    [3 4 6]          
+                ],[
+                    [4 9 13]          
+                    [7 13 12]          
+                    [4 9 12 4 12 7] 
+                    [3 12 9]          
+                    [4 3 12 4 12 13] 
+                    [9 3 7 9 7 13] 
+                    [3 7 4]          
+                ]
+            ]
+
 class Tetras
     
     @renderScene: (scene) ->
@@ -43,11 +95,11 @@ class Tetras
         for i in [0..15]
             for j in [0..15]
                 indices = indices.concat tetraind.map (idx) -> idx+vertices.length/3
-                vertices = vertices.concat frame i*2,0,j*2
-                if (i+j*16)&1 then points.push i*2,  0,j*2
-                if (i+j*16)&2 then points.push i*2+1,0,j*2
-                if (i+j*16)&4 then points.push i*2,  1,j*2
-                if (i+j*16)&8 then points.push i*2+1,1,j*2
+                vertices = vertices.concat frame i*2,  0,j*2
+                if (i+j*16)&1   then points.push i*2,  0,j*2
+                if (i+j*16)&2   then points.push i*2+1,0,j*2
+                if (i+j*16)&4   then points.push i*2,  1,j*2
+                if (i+j*16)&8   then points.push i*2+1,1,j*2
                 if (i+j*16)&16  then points.push i*2,  0,j*2+1
                 if (i+j*16)&32  then points.push i*2+1,0,j*2+1
                 if (i+j*16)&64  then points.push i*2,  1,j*2+1
@@ -105,107 +157,33 @@ class Tetras
         
     @cube: (index) ->
         
-        tetras = []
-        inouts = []
+        tt = [
+            [4, 3,   1,  0,    2, 0,  32, 3]
+            [4, 3,   1,  0,   16, 3,  32, 3]
+            [4, 3,  64,  6,   16, 3,  32, 3]
+            [4, 3,   8,  3,    2, 0,  32, 3]
+            [4, 3,   8,  3,  128, 6,  32, 3]
+            [4, 3,  64,  6,  128, 6,  32, 3]
+        ]
         
-        tetra1 = ((index & 4) >> 2) | ((index & 1  ) << 1) | ((index &  2) << 1) | ((index & 32) >> 2)
-        tetra2 = ((index & 4) >> 2) | ((index & 1  ) << 1) | ((index & 16) >> 2) | ((index & 32) >> 2)
-        tetra3 = ((index & 4) >> 2) | ((index & 64 ) >> 5) | ((index & 16) >> 2) | ((index & 32) >> 2)
-        
-        tetra4 = ((index & 4) >> 2) | ((index &  8 ) >> 2) | ((index &  2) << 1) | ((index & 32) >> 2)
-        tetra5 = ((index & 4) >> 2) | ((index &  8 ) >> 2) | ((index &128) >> 5) | ((index & 32) >> 2)
-        tetra6 = ((index & 4) >> 2) | ((index & 64 ) >> 5) | ((index &128) >> 5) | ((index & 32) >> 2)
-        
-        if tetra1 and tetra1 != 0b1111
-            tetras.push 0
-            inouts.push tetra1
-
-        if tetra2 and tetra2 != 0b1111
-            tetras.push 1
-            inouts.push tetra2
-
-        if tetra3 and tetra3 != 0b1111
-            tetras.push 2
-            inouts.push tetra3
-
-        if tetra4 and tetra4 != 0b1111
-            tetras.push 3
-            inouts.push tetra4
-
-        if tetra5 and tetra5 != 0b1111
-            tetras.push 4
-            inouts.push tetra5
-
-        if tetra6 and tetra6 != 0b1111
-            tetras.push 5
-            inouts.push tetra6
-            
         indices = []
-        for i in [0...tetras.length]
-            indices = indices.concat @tetra tetras[i], inouts[i]
-            
+        for ti in [0..5]
+            t = tt[ti]
+            r = 0
+            for i in [0..6] by 2
+                r |= ((index & t[i]) << 1) >> t[i+1]
+            if r and r != 0b1111
+                indices = indices.concat @tetra ti, r
+        
         indices
-            
+        
     @tetra: (tetra, io) ->
         
-        
         i = if io > 7 then 14-io else io-1
-        a = [
-                [
-                    [0 5 4]          
-                    [0 14 15]          
-                    [4 14 15 4 15 5] 
-                    [5 15 16]          
-                    [4 15 16 4 0 15] 
-                    [5 14 16 5 0 14] 
-                    [4 14 16]          
-                ],[
-                    [0 4 8]          
-                    [0 18 14]          
-                    [8 18 14 8 14 4] 
-                    [8 17 18]          
-                    [0 17 18 0 4 17] 
-                    [8 17 14 8 14 0] 
-                    [4 17 14]          
-                ],[
-                    [4 13 8]          
-                    [2 13 7]          
-                    [7 2 8 7 8 4] 
-                    [2 17 8]          
-                    [17 13 2 17 4 13] 
-                    [7 17 8 7 8 13] 
-                    [4 7 17]          
-                ],[
-                    [4 5 10]          
-                    [1 6 10]          
-                    [6 4 5 6 5 1] 
-                    [1 5 16]          
-                    [1 10 4 1 4 16] 
-                    [6 10 5 6 5 16] 
-                    [6 4 16]          
-                ],[
-                    [4 10 9]          
-                    [6 11 10]          
-                    [4 6 11 4 11 9] 
-                    [3 9 11]          
-                    [4 10 11 4 11 3] 
-                    [6 3 9 6 9 10] 
-                    [3 4 6]          
-                ],[
-                    [4 9 13]          
-                    [7 13 12]          
-                    [4 9 12 4 12 7] 
-                    [3 12 9]          
-                    [4 3 12 4 12 13] 
-                    [9 3 7 9 7 13] 
-                    [3 7 4]          
-                ]
-            ][tetra][i]
-            
+        a = TETRA[tetra][i]
         if io > 7
             [a[1], a[2]] = [a[2], a[1]]
             if a.length > 3 then [a[4], a[5]] = [a[5], a[4]]
         a
-        
         
 module.exports = Tetras
