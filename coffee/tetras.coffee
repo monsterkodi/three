@@ -6,7 +6,7 @@
    000     00000000     000     000   000  000   000  0000000 
 ###
 
-{ klog } = require 'kxk'
+{ _ } = require 'kxk'
 { BufferGeometry, Float32BufferAttribute, LineSegments, Mesh, MeshStandardMaterial, Points, PointsMaterial, WireframeGeometry } = require 'three'
 
 TETRA = [
@@ -66,9 +66,9 @@ class Tetras
     @renderScene: (scene) ->
         
         material = new MeshStandardMaterial 
-            metalness: 0.5
-            roughness: 0.5
-            flatShading: true
+            metalness:    0.5
+            roughness:    0.5
+            flatShading:  true
             vertexColors: true
                         
         cubevert = [
@@ -178,12 +178,13 @@ class Tetras
         indices
         
     @tetra: (tetra, io) ->
-        
-        i = if io > 7 then 14-io else io-1
-        a = TETRA[tetra][i]
-        if io > 7
+        if io <= 7
+            TETRA[tetra][io-1]
+        else
+            a = _.clone TETRA[tetra][14-io]
             [a[1], a[2]] = [a[2], a[1]]
-            if a.length > 3 then [a[4], a[5]] = [a[5], a[4]]
-        a
+            if a.length > 3 
+                [a[4], a[5]] = [a[5], a[4]]
+            a
         
 module.exports = Tetras
