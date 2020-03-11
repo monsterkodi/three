@@ -6,7 +6,7 @@
    000     00000000     000     000   000  000   000  0000000 
 ###
 
-{ _ } = require 'kxk'
+{ klog } = require 'kxk'
 { BufferGeometry, Float32BufferAttribute, LineSegments, Mesh, MeshStandardMaterial, Points, PointsMaterial, WireframeGeometry } = require 'three'
 
 TETRA = [
@@ -48,10 +48,13 @@ class Tetras
         @points   = []
         
         if false then @debugGrid scene
-                        
-        for i in [0..15]
-            for j in [0..15]
-                @addCube i+j*16, i*2, 0, j*2
+              
+        klog 'cubes'
+        ▸profile 'cubes'
+            for i in [0..15]
+                for j in [0..15]
+                    for k in [0..15]
+                        @addCube i+j+k, i,j,k
         
         geometry = new BufferGeometry()
         geometry.setIndex @indices
@@ -67,34 +70,23 @@ class Tetras
     # 000       000   000  000   000  000       
     #  0000000   0000000   0000000    00000000  
     
-    @addCube: (cubeIndex, x, y, z) ->
-        
-        @indices = @indices.concat @cube(cubeIndex).map (idx) => idx+@vertices.length/3
-        @vertices = @vertices.concat @cubeVertices x,y,z
-                
-    @cubeVertices: (x0, y0, z0) ->
-        v = []
-        xh = x0+0.5; x1 = x0+1.0
-        yh = y0+0.5; y1 = y0+1.0
-        zh = z0+0.5; z1 = z0+1.0
-        v.push x0,yh,z0,  x1,yh,z0,  x0,yh,z1,  x1,yh,z1
-        for j in [0.5 1.0 0.0]
-            v.push xh,y0+j,zh, xh,y0+j,z0, x1,y0+j,zh, xh,y0+j,z1, x0,y0+j,zh
-        v
+    @addCube: (index, x, y, z) ->
     
-    @cube: (index) ->
-        
-        indices = []
         for ti in [0..5]
             t = CUBE[ti]
             r = 0
             for i in [0..6] by 2
                 r |= ((index & t[i]) << 1) >> t[i+1]
             if r and r != 0b1111
-                indices = indices.concat @tetra ti, r
+                @tetra ti, r
         
-        indices
-        
+        xh = x+0.5; x1 = x+1
+        yh = y+0.5; y1 = y+1
+        zh = z+0.5; z1 = z+1
+        @vertices.push x,yh,z,  x1,yh,z,  x,yh,z1,  x1,yh,z1
+        for j in [0.5 1 0]
+            @vertices.push xh,y+j,zh, xh,y+j,z, x1,y+j,zh, xh,y+j,z1, x,y+j,zh
+            
     # 000000000  00000000  000000000  00000000    0000000   
     #    000     000          000     000   000  000   000  
     #    000     0000000      000     0000000    000000000  
@@ -102,14 +94,19 @@ class Tetras
     #    000     00000000     000     000   000  000   000  
     
     @tetra: (tetra, io) ->
+        
+        o = @vertices.length/3 
         if io <= 7
-            TETRA[tetra][io-1]
+            a = TETRA[tetra][io-1]
+            for i in [0...a.length]
+                @indices.push a[i]+o
         else
-            a = _.clone TETRA[tetra][14-io]
-            [a[1],a[2]] = [a[2],a[1]]
-            if a.length > 3 then [a[4],a[5]] = [a[5],a[4]]
-            a
-    
+            a = TETRA[tetra][14-io]
+            for i in [0...a.length/3]
+                @indices.push a[i]+o
+                @indices.push a[i+2]+o
+                @indices.push a[i+1]+o
+                
     # 0000000    00000000  0000000    000   000   0000000   
     # 000   000  000       000   000  000   000  000        
     # 000   000  0000000   0000000    000   000  000  0000  
@@ -169,6 +166,10 @@ class Tetras
         scene.add new Points geometry, pmat
     
         @vertices = []
-        @indices  = [] 
+        @indices  = []
+        
+        for i in [0..15]
+            for j in [0..15]
+                @addCube i+j*16, i*2, 0, j*2
             
 module.exports = Tetras
