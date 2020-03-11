@@ -7,7 +7,7 @@
 ###
 
 { klog } = require 'kxk'
-{ BufferGeometry, Float32BufferAttribute, LineSegments, Mesh, MeshStandardMaterial, Points, PointsMaterial, WireframeGeometry } = require 'three'
+{ BufferAttribute, BufferGeometry, Float32BufferAttribute, LineSegments, Mesh, MeshStandardMaterial, Points, PointsMaterial, Uint32BufferAttribute, WireframeGeometry } = require 'three'
 
 TETRA = [
     [ [0 5 4] [0 14 15] [4 14 15 4 15 5] [5 15 16] [4 15 16 4 0 15] [5 14 16 5 0 14] [4 14 16] ]
@@ -43,23 +43,28 @@ class Tetras
             flatShading:  true
             # vertexColors: true
             
-        @vertices = []
-        @indices  = [] 
+        @cubeSize = 100
+        
+        @vertices = new Float32Array @cubeSize*@cubeSize*@cubeSize*3*19
+        @indices  = new Uint32Array @cubeSize*@cubeSize*@cubeSize*3*6*2
+        @vertex   = -1
+        @index    = -1
         @points   = []
         
         if false then @debugGrid scene
               
-        klog 'cubes'
-        ▸profile 'cubes'
-            for i in [0..15]
-                for j in [0..15]
-                    for k in [0..15]
+        klog 'cubes' @vertices.length, @indices.length
+        ▸average 10
+            @vertex = -1
+            @index  = -1
+            for i in [0...@cubeSize]
+                for j in [0...@cubeSize]
+                    for k in [0...@cubeSize]
                         @addCube i+j+k, i,j,k
         
         geometry = new BufferGeometry()
-        geometry.setIndex @indices
-        geometry.setAttribute 'position' new Float32BufferAttribute @vertices, 3
-        # geometry.setAttribute 'color'    new Float32BufferAttribute @vertices, 3
+        geometry.setIndex new Uint32BufferAttribute @indices.slice(0 @index), 1
+        geometry.setAttribute 'position' new BufferAttribute @vertices, 3
         mesh = new Mesh geometry, material
         
         scene.add mesh
@@ -83,9 +88,44 @@ class Tetras
         xh = x+0.5; x1 = x+1
         yh = y+0.5; y1 = y+1
         zh = z+0.5; z1 = z+1
-        @vertices.push x,yh,z,  x1,yh,z,  x,yh,z1,  x1,yh,z1
+
+        @vertices[@vertex++] = x
+        @vertices[@vertex++] = yh
+        @vertices[@vertex++] = z
+        
+        @vertices[@vertex++] = x1
+        @vertices[@vertex++] = yh
+        @vertices[@vertex++] = z
+        
+        @vertices[@vertex++] = x
+        @vertices[@vertex++] = yh
+        @vertices[@vertex++] = z1
+        
+        @vertices[@vertex++] = x1
+        @vertices[@vertex++] = yh
+        @vertices[@vertex++] = z1
+        
         for j in [0.5 1 0]
-            @vertices.push xh,y+j,zh, xh,y+j,z, x1,y+j,zh, xh,y+j,z1, x,y+j,zh
+
+            @vertices[@vertex++] = xh
+            @vertices[@vertex++] = y+j
+            @vertices[@vertex++] = zh
+            
+            @vertices[@vertex++] = xh
+            @vertices[@vertex++] = y+j
+            @vertices[@vertex++] = z
+            
+            @vertices[@vertex++] = x1
+            @vertices[@vertex++] = y+j
+            @vertices[@vertex++] = zh
+            
+            @vertices[@vertex++] = xh
+            @vertices[@vertex++] = y+j
+            @vertices[@vertex++] = z1
+            
+            @vertices[@vertex++] = x
+            @vertices[@vertex++] = y+j
+            @vertices[@vertex++] = zh
             
     # 000000000  00000000  000000000  00000000    0000000   
     #    000     000          000     000   000  000   000  
@@ -95,17 +135,17 @@ class Tetras
     
     @tetra: (tetra, io) ->
         
-        o = @vertices.length/3 
+        o = @vertex/3 
         if io <= 7
             a = TETRA[tetra][io-1]
             for i in [0...a.length]
-                @indices.push a[i]+o
+                @indices[@index++] = a[i]+o
         else
             a = TETRA[tetra][14-io]
             for i in [0...a.length/3]
-                @indices.push a[i]+o
-                @indices.push a[i+2]+o
-                @indices.push a[i+1]+o
+                @indices[@index++] = a[i]+o
+                @indices[@index++] = a[i+2]+o
+                @indices[@index++] = a[i+1]+o
                 
     # 0000000    00000000  0000000    000   000   0000000   
     # 000   000  000       000   000  000   000  000        
@@ -165,6 +205,7 @@ class Tetras
         pmat.transparent = true
         scene.add new Points geometry, pmat
     
+        @vertex   = -1
         @vertices = []
         @indices  = []
         
