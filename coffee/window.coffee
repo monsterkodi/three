@@ -8,7 +8,7 @@
 
 { $, deg2rad, keyinfo, kpos, prefs, win } = require 'kxk'
 
-{ AmbientLight, AxesHelper, Camera, Color, Fog, GridHelper, Mesh, MeshStandardMaterial, PCFSoftShadowMap, PlaneGeometry, PointLight, PointLightHelper, Raycaster, Scene, Vector2, WebGLRenderer } = require 'three'
+{ AmbientLight, AxesHelper, Camera, Color, Fog, GridHelper, Mesh, MeshStandardMaterial, PCFSoftShadowMap, PlaneGeometry, PointLight, Raycaster, Scene, Vector2, WebGLRenderer } = require 'three'
 
 Camera = require './camera'
 FPS    = require './fps'
@@ -80,7 +80,7 @@ class MainWin extends win
         @sun.shadow.mapSize = new Vector2 2*2048, 2*2048
         @scene.add @sun
         
-        @scene.add new PointLightHelper @sun, 1
+        # @scene.add new PointLightHelper @sun, 1
                 
         @ambient = new AmbientLight 0x181818
         @scene.add @ambient
@@ -124,8 +124,8 @@ class MainWin extends win
         
         @fps?.draw()
         @sun.position.copy @camera.getPosition()
-        @sun.position.add  @camera.getUp().multiplyScalar 3.0
-        @sun.position.add  @camera.getRight().multiplyScalar -3.0
+        # @sun.position.add  @camera.getUp().multiplyScalar 3.0
+        # @sun.position.add  @camera.getRight().multiplyScalar -3.0
 
         @renderer.render @scene, @camera        
         requestAnimationFrame @renderScene
@@ -302,7 +302,8 @@ class MainWin extends win
         for intersect in @raycaster.intersectObjects @scene.children
             if intersect?.object?.type == 'Mesh'
                 if intersect.object.name != 'plane'
-                    @camera.setPivotCenter intersect.object.position
+                    intersect.object.geometry.computeBoundingSphere()
+                    @camera.setPivotCenter intersect.object.geometry.boundingSphere.center
                     return
     
     # 00     00  00000000  000   000  000   000  

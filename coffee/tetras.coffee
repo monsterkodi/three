@@ -8,7 +8,7 @@
 
 { klog } = require 'kxk'
 { BufferAttribute, BufferGeometry, Float32BufferAttribute, LineSegments, Mesh, MeshStandardMaterial, Points, PointsMaterial, Uint32BufferAttribute, Vector3, WireframeGeometry } = require 'three'
-{ max } = Math
+{ sin } = Math
 
 TETRA = [
     [ [0 5 4] [0 14 15] [4 14 15 4 15 5] [5 15 16] [4 15 16 4 0 15] [5 14 16 5 0 14] [4 14 16] ]
@@ -40,9 +40,9 @@ class Tetras
     
     @renderScene: (scene) ->
                    
-        if true then @debugGrid scene
+        if false then @debugGrid scene
             
-        @cubeSize = 10
+        @cubeSize = 40
         
         @vertices = new Float32Array @cubeSize*@cubeSize*@cubeSize*3*19
         @indices  = new Uint32Array @cubeSize*@cubeSize*@cubeSize*3*6*2
@@ -69,10 +69,28 @@ class Tetras
             geometry.setAttribute 'position' new BufferAttribute @vertices, 3
             # geometry.setAttribute 'color' new BufferAttribute @vertices, 3
             scene.add new Mesh geometry, new MeshStandardMaterial 
-                metalness:    0.5
-                roughness:    0.5
+                metalness:    0.0
+                roughness:    1.0
+                color:        0x333333
                 flatShading:  true
       
+        if false
+            points = []
+            for i in [0...@cubeSize]
+                for j in [0...@cubeSize]
+                    for k in [0...@cubeSize]
+                        if @cubeAt(i, j, k) & 1
+                            points.push i, j, k
+                
+            geometry = new BufferGeometry()
+            geometry.setAttribute 'position' new Float32BufferAttribute points, 3
+            pmat = new PointsMaterial color:0xffff88
+            pmat.size        = 0.1
+            pmat.depthTest   = false
+            pmat.opacity     = 0.5
+            pmat.transparent = true
+            scene.add new Points geometry, pmat
+                
     @cubeAt: (i, j, k) ->
         
         c = 0
@@ -81,8 +99,12 @@ class Tetras
             y = j+OFFSET[a*3+1]
             z = k+OFFSET[a*3+2]
             v = new Vector3 x,y,z
+            v.add new Vector3 0.5 0.5 0.5
             v.sub new Vector3 @cubeSize/2 @cubeSize/2 @cubeSize/2
-            c |= (((v.length() <= @cubeSize/2) and 1 or 0) << a)
+            # c |= (((v.length() <= @cubeSize/3) and 1 or 0) << a)
+            c |= (((sin(x+y)*4.0 <= z) and 1 or 0) << a)
+            # c |= (((y <= 1) and 1 or 0) << a)
+            # c |= (((x+z+y <= 5) and 1 or 0) << a)
         c
         
     #  0000000  000   000  0000000    00000000  
@@ -158,8 +180,8 @@ class Tetras
                 @indices[@index++] = a[i]+o
         else
             a = TETRA[tetra][14-io]
-            for i in [0...a.length/3]
-                @indices[@index++] = a[i]+o
+            for i in [0..a.length] by 3
+                @indices[@index++] = a[i+0]+o
                 @indices[@index++] = a[i+2]+o
                 @indices[@index++] = a[i+1]+o
                 
@@ -233,6 +255,9 @@ class Tetras
         for i in [0..15]
             for j in [0..15]
                 @addCube i+j*16, i*2, 0, j*2
+                
+        # @addCube 255-51, 0 0 0
+        # @addCube 51, 0 0 0
                 
         geometry = new BufferGeometry()
         geometry.setIndex new Uint32BufferAttribute @indices.slice(0 @index), 1
